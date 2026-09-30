@@ -10,6 +10,8 @@ let choicesKey = '';
 let pending = false;
 let connected = false;
 let revision = 0;
+let lastError = '';
+let logText = '';
 const busy = () => ['probing', 'downloading', 'processing'].includes(state.phase);
 const bytes = n => {
   if (!Number.isFinite(n) || n <= 0) return '0 B';
@@ -78,7 +80,20 @@ function render() {
     const details = {probing: 'Conectando con el sitio. Esto puede tardar unos segundos.', downloading: 'Iniciando la descarga…', processing: 'Uniendo video y audio o convirtiendo a MP3.', done: 'Lo encontrarás en tu carpeta de descargas.', cancelled: 'Los archivos parciales se conservan. Puedes volver a analizar el enlace.'};
     $('activity-detail').textContent = details[state.phase] || '';
   }
-  if (state.phase === 'error') notice(state.error);
+  const nextLogs = (state.logs || []).join('\n');
+  if (nextLogs !== logText) {
+    const output = $('log-output');
+    const atBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 30;
+    logText = nextLogs;
+    output.textContent = logText || 'Todavía no hay eventos. Analiza un enlace para comenzar.';
+    if (atBottom) output.scrollTop = output.scrollHeight;
+  }
+  if (state.phase === 'error') {
+    notice(state.error);
+    if (state.error !== lastError) $('diagnostics').open = true;
+    lastError = state.error;
+  } else lastError = '';
+
 }
 async function action(path, data) {
   if (pending) return;
@@ -96,6 +111,18 @@ $('url-form').addEventListener('submit', event => {
   void action('analyze', {url: value});
 });
 $('download').addEventListener('click', () => void action('download', {index: selected}));
+$('copy-logs').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(logText || 'No hay eventos registrados.');
+    $('copy-status').textContent = 'Copiado';
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents($('log-output'));
+    const selection = window.getSelection();
+    selection.removeAllRanges(); selection.addRange(range);
+    $('copy-status').textContent = 'Seleccionado. Usa Ctrl+C para copiar.';
+  }
+});
 $('cancel').addEventListener('click', () => void action('cancel', {}));
 async function poll() {
   if (!pending) {

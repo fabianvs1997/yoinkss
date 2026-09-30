@@ -67,6 +67,7 @@ export function createGuiServer(outDir: string, assetRoot: URL, session = new Gu
       res.writeHead(200, {'Content-Type': asset[1]})
       res.end(bytes)
     } catch (error) {
+      session.log(`Error de la interfaz: ${error instanceof Error ? error.message : String(error)}`)
       reply(400, {error: error instanceof Error ? error.message : 'No se pudo completar la solicitud.'})
     }
   })

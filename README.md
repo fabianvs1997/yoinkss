@@ -41,6 +41,38 @@ No lo expongas a internet ni compartas el enlace de sesión. La interfaz no carg
 fuentes, scripts ni imágenes de terceros; las descargas sí contactan los sitios
 indicados. Los títulos del contenido se muestran como texto, nunca como HTML.
 
+### Diagnóstico de errores
+
+Abre **Diagnóstico y logs** debajo del formulario. Se despliega automáticamente
+al fallar una tarea y permite **Copiar diagnóstico**. Los mismos mensajes aparecen
+en la terminal donde ejecutaste `npm run gui`: comprobación de ejecutables,
+advertencias/errores de yt-dlp, códigos de salida y fases de la descarga.
+Se mantienen los últimos 100 mensajes en memoria; no se crea un archivo de log.
+Se omiten URLs completas detectadas, tokens Bearer y secuencias de control.
+Revisa el texto antes de compartirlo, pues otros detalles del contenido o rutas
+pueden aparecer en mensajes de terceros.
+
+Si ves «No se encontró yt-dlp o no pudo ejecutarse», en PowerShell comprueba:
+
+```powershell
+Get-Command yt-dlp
+yt-dlp --version
+```
+
+Si no está instalado, el proyecto yt-dlp documenta esta instalación para Windows:
+
+```powershell
+winget install --source winget --id yt-dlp.yt-dlp
+```
+
+Fuente: https://github.com/yt-dlp/yt-dlp/wiki/Installation#winget
+
+Después de instalarlo, cierra la terminal y abre una nueva (reinicia también tu
+editor si usas su terminal integrada) para actualizar el PATH. Comprueba otra
+vez `yt-dlp --version`, vuelve a la carpeta del proyecto y ejecuta `npm run gui`.
+Si ya está instalado pero no arranca, el diagnóstico distingue `ENOENT`, permisos,
+tiempo de espera o una salida distinta de cero; no todos equivalen a falta de instalación.
+
 ## Install this security-hardened variant
 
 Use Node.js 24 and install yt-dlp and ffmpeg separately from their official

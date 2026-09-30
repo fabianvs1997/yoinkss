@@ -3,26 +3,41 @@ import path from 'node:path'
 import {isProbablyUrl} from './platforms.js'
 import {formatBytes} from './format.js'
 
+export type Diagnostic = (message: string) => void
+
 // async on purpose: a spawnSync here blocks the event loop, which freezes
 // ink mid-frame — the user hits enter and sees nothing until it returns
-function commandWorks(cmd: string, args: string[]): Promise<boolean> {
+function commandWorks(cmd: string, args: string[], diagnostic?: Diagnostic): Promise<boolean> {
   return new Promise(resolve => {
     let child
+    let stderr = ''
+    let stdout = ''
+    diagnostic?.(`Comprobando ${cmd} ${args.join(' ')}`)
     try {
-      child = spawn(cmd, args, {stdio: 'ignore', timeout: 10_000})
-    } catch {
+      child = spawn(cmd, args, {stdio: ['ignore', 'pipe', 'pipe'], timeout: 10_000})
+    } catch (error) {
+      diagnostic?.(`No se pudo iniciar ${cmd}: ${String(error)}`)
       resolve(false)
       return
     }
-    child.on('error', () => resolve(false))
-    child.on('close', code => resolve(code === 0))
+    child.stdout.on('data', chunk => { stdout = (stdout + chunk).slice(-1024) })
+    child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-8192) })
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      diagnostic?.(`${cmd}: ${error.code ?? 'ERROR'} — ${error.message}`)
+      resolve(false)
+    })
+    child.on('close', (code, signal) => {
+      if (code === 0) diagnostic?.(`${cmd} disponible: ${stdout.trim().split('\n')[0] || 'OK'}`)
+      else diagnostic?.(`${cmd} falló: código ${code}, señal ${signal ?? 'ninguna'}. ${stderr.trim() || 'Sin salida de error.'}`)
+      resolve(code === 0)
+    })
   })
 }
 
 /** Use an explicitly installed binary; never download and execute a moving release. */
-export async function ensureYtDlp(_onStatus: (message: string) => void, signal?: AbortSignal): Promise<string> {
+export async function ensureYtDlp(_onStatus: (message: string) => void, signal?: AbortSignal, diagnostic?: Diagnostic): Promise<string> {
   signal?.throwIfAborted()
-  if (await commandWorks('yt-dlp', ['--ignore-config', '--no-plugin-dirs', '--version'])) return 'yt-dlp'
+  if (await commandWorks('yt-dlp', ['--ignore-config', '--no-plugin-dirs', '--version'], diagnostic)) return 'yt-dlp'
   throw new Error('Install yt-dlp from its official distribution and add it to PATH. Automatic executable downloads are disabled.')
 }
 
@@ -31,15 +46,16 @@ export async function ensureYtDlp(_onStatus: (message: string) => void, signal?:
  * ffmpeg-static as fallback. Returns undefined if neither exists — yt-dlp
  * still works for single-file formats without it.
  */
-export async function findFfmpeg(): Promise<string | undefined> {
-  if (await commandWorks('ffmpeg', ['-version'])) return undefined // on PATH, yt-dlp finds it itself
+export async function findFfmpeg(diagnostic?: Diagnostic): Promise<string | undefined> {
+  if (await commandWorks('ffmpeg', ['-version'], diagnostic)) return undefined // on PATH, yt-dlp finds it itself
   try {
     const mod = await import('ffmpeg-static')
     const ffmpegPath = (mod.default ?? mod) as unknown as string | null
-    if (ffmpegPath && (await commandWorks(ffmpegPath, ['-version']))) return ffmpegPath
+    if (ffmpegPath && (await commandWorks(ffmpegPath, ['-version'], diagnostic))) return ffmpegPath
   } catch {
     // ffmpeg-static not installed or unsupported platform
   }
+  diagnostic?.('FFmpeg no está disponible. La unión de video/audio y conversión MP3 pueden fallar.')
   return undefined
 }
 
@@ -69,16 +85,20 @@ export type ProbeResult = {
   info: VideoInfo
 }
 
-export async function probe(ytdlp: string, url: string, signal?: AbortSignal): Promise<ProbeResult> {
+export async function probe(ytdlp: string, url: string, signal?: AbortSignal, diagnostic?: Diagnostic): Promise<ProbeResult> {
   if (!isProbablyUrl(url)) throw new Error('Only HTTP and HTTPS URLs are supported.')
   const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(ytdlp, ['--ignore-config', '--no-plugin-dirs', '-J', '--no-playlist', '--no-warnings', '--', url], {signal})
+    const child = spawn(ytdlp, ['--ignore-config', '--no-plugin-dirs', '-J', '--no-playlist', ...(diagnostic ? [] : ['--no-warnings']), '--', url], {signal})
     let out = ''
     let stderr = ''
     child.stdout.on('data', chunk => (out += chunk))
-    child.stderr.on('data', chunk => (stderr += chunk))
-    child.on('error', reject)
-    child.on('close', code => {
+    child.stderr.on('data', chunk => {
+      stderr = (stderr + chunk).slice(-32768)
+      diagnostic?.(`yt-dlp: ${String(chunk).trim()}`)
+    })
+    child.on('error', error => { diagnostic?.(`yt-dlp: ${error.message}`); reject(error) })
+    child.on('close', (code, signal) => {
+      diagnostic?.(`Análisis terminado: código ${code}, señal ${signal ?? 'ninguna'}`)
       if (code !== 0) {
         reject(new Error(cleanYtDlpError(stderr) || `yt-dlp exited with code ${code}`))
       } else {
@@ -172,6 +192,7 @@ export type DownloadProgress = {
 export type DownloadHandlers = {
   onProgress: (progress: DownloadProgress) => void
   onProcessing: () => void
+  onDiagnostic?: Diagnostic
 }
 
 const PROGRESS_PREFIX = 'YOINK|'
@@ -197,7 +218,7 @@ export function download(
     '--no-plugin-dirs',
     ...opts.choice.args,
     '--no-playlist',
-    '--no-warnings',
+    ...(handlers.onDiagnostic ? [] : ['--no-warnings']),
     '--newline',
     // --print implies --quiet, which suppresses progress bars and the
     // [Merger]/[ExtractAudio] lines we detect the processing phase from
@@ -256,9 +277,13 @@ export function download(
         }
       }
     })
-    child.stderr.on('data', chunk => (stderr += chunk))
-    child.on('error', reject)
-    child.on('close', code => {
+    child.stderr.on('data', chunk => {
+      stderr = (stderr + chunk).slice(-32768)
+      handlers.onDiagnostic?.(`yt-dlp: ${String(chunk).trim()}`)
+    })
+    child.on('error', error => { handlers.onDiagnostic?.(`yt-dlp: ${error.message}`); reject(error) })
+    child.on('close', (code, signalName) => {
+      handlers.onDiagnostic?.(`Descarga terminada: código ${code}, señal ${signalName ?? 'ninguna'}`)
       activeChild = undefined
       if (signal?.aborted) {
         // Preserve partial files: subprocess output is not authority to delete paths.

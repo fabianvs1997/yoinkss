@@ -42,3 +42,17 @@ test('cancel never deletes a path reported by subprocess output', {skip: process
     await fs.rm(dir, {recursive: true, force: true})
   }
 })
+
+test('probe exposes subprocess stderr and exit code for diagnostics', {skip: process.platform === 'win32'}, async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yoinks-test-'))
+  const messages: string[] = []
+  try {
+    const executable = path.join(dir, 'fake-ytdlp')
+    await fs.writeFile(executable, `#!${process.execPath}\nconsole.error('ERROR: simulated failure'); process.exit(3)\n`, {mode: 0o700})
+    await assert.rejects(probe(executable, 'https://example.com/video', undefined, message => messages.push(message)), /simulated failure/)
+    assert.ok(messages.some(message => message.includes('ERROR: simulated failure')))
+    assert.ok(messages.some(message => message.includes('código 3')))
+  } finally {
+    await fs.rm(dir, {recursive: true, force: true})
+  }
+})

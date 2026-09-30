@@ -589,3 +589,10 @@ progress:not([value]) {
     font-size:9px;
   }
 }
+
+.diagnostics {border-top:1px solid var(--line);padding:18px 0;font-size:12px;color:#656977}
+.diagnostics summary {cursor:pointer;display:flex;justify-content:space-between;font-weight:650;color:#535063}
+.diagnostics p {font-size:11px;line-height:1.6}
+.diagnostics button {background:#f2efff;color:var(--purple);border:1px solid #ddd6fc;border-radius:7px;padding:8px 12px;font-size:11px}
+#copy-status {font-size:11px;margin-left:10px}
+#log-output {white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;background:#191c25;color:#d4dcf0;border-radius:9px;padding:14px;font:11px/1.7 ui-monospace,Consolas,monospace}
