@@ -14,6 +14,33 @@ no sketchy redirects.
 
 <img src="assets/home.png" alt="yoinks home screen — paste a link and hit yoink" width="100%">
 
+## Interfaz gráfica local (español)
+
+La interfaz abre una página en tu navegador y funciona solo en tu computadora.
+Desde la carpeta del proyecto, con Node.js 24, yt-dlp y FFmpeg instalados:
+
+```sh
+git pull origin Master
+npm ci --ignore-scripts
+npm run build
+npm run gui
+```
+
+Pega un enlace, pulsa **Analizar enlace**, elige la calidad o **Solo audio** y
+pulsa **Descargar archivo**. Verás el progreso y la ruta al terminar. Los archivos
+se guardan en `Downloads`, dentro de tu carpeta de usuario. **Cancelar** conserva
+los archivos parciales. El historial y el acceso al portapapeles están desactivados.
+
+Mantén abierta la terminal. Si el navegador no se abre automáticamente, copia el
+enlace completo que aparece en ella. Para cerrar el servidor, pulsa `Ctrl+C`.
+`npm run gui:serve` inicia el servidor sin intentar abrir el navegador.
+
+El servidor escucha exclusivamente en `127.0.0.1`, elige un puerto disponible y
+protege su API con una clave aleatoria por sesión, validación de Host y Origin.
+No lo expongas a internet ni compartas el enlace de sesión. La interfaz no carga
+fuentes, scripts ni imágenes de terceros; las descargas sí contactan los sitios
+indicados. Los títulos del contenido se muestran como texto, nunca como HTML.
+
 ## Install this security-hardened variant
 
 Use Node.js 24 and install yt-dlp and ffmpeg separately from their official

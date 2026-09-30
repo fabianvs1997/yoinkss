@@ -7,7 +7,8 @@
     "yoinks": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "web"
   ],
   "engines": {
     "node": ">=18"
@@ -18,7 +19,9 @@
     "test": "node --import tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "start": "node dist/cli.js",
-    "prepublishOnly": "npm test && npm run typecheck && npm run build"
+    "prepublishOnly": "npm test && npm run typecheck && npm run build",
+    "gui": "node dist/gui.js --open",
+    "gui:serve": "node dist/gui.js"
   },
   "author": "Pablo Stanley",
   "keywords": [

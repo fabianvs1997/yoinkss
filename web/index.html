@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><title>yoinkss — Tu enlace. Tu archivo.</title>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header><a class="brand" href="/" aria-label="yoinkss, inicio"><span class="brand-mark">y</span>yoinkss<span class="brand-dot">.</span></a><span class="local-badge"><span></span> EN TU COMPUTADORA</span></header>
+    <main>
+      <section class="hero"><p class="eyebrow">DEL ENLACE A TU CARPETA</p><h1>Eso que quieres guardar.<br><span>Ya es tuyo.</span></h1><p class="intro">Videos en su mejor calidad. Audio para llevar.<br>Pega un enlace y elige cómo guardarlo.</p></section>
+      <section class="workspace" aria-label="Descargar contenido">
+        <div class="card-top"><span class="step-label"><b>01</b> PEGA TU ENLACE</span><span class="private-label">Sin historial guardado</span></div>
+        <form id="url-form"><label class="sr-only" for="url">Enlace del video</label><div class="input-wrap"><span class="link-icon" aria-hidden="true">↗</span><input id="url" type="url" placeholder="https://www.youtube.com/watch?v=…" required maxlength="4096" autocomplete="off" spellcheck="false"><button id="analyze" type="submit">Analizar enlace <span aria-hidden="true">→</span></button></div></form>
+        <div class="sources"><span>YOUTUBE</span><i>·</i><span>INSTAGRAM</span><i>·</i><span>TIKTOK</span><i>·</i><span>X</span><i>·</i><span>Y MÁS SITIOS</span></div>
+        <div id="notice" role="alert" hidden></div>
+        <div id="result" hidden>
+          <div class="divider"></div>
+          <div class="media-heading"><div class="media-icon" aria-hidden="true">▶</div><div><p class="eyebrow">LISTO PARA GUARDAR</p><h2 id="video-title"></h2><p id="video-meta"></p></div></div>
+          <div id="picker"><div class="format-heading"><span class="step-label"><b>02</b> ELIGE EL FORMATO</span><span class="estimate">Tamaños aproximados</span></div><div id="choices" role="group" aria-label="Formatos de descarga"></div><button id="download" class="download-button" type="button">Descargar archivo <span aria-hidden="true">↓</span></button></div>
+        </div>
+        <section id="activity" aria-label="Estado de la tarea" hidden><div class="activity-heading"><div><span id="activity-label" role="status" aria-live="polite"></span><p id="activity-detail"></p></div><button id="cancel" type="button">Cancelar</button></div><progress id="progress" max="100" aria-label="Progreso de la descarga"></progress><p id="file-path"></p></section>
+        <div class="destination"><span aria-hidden="true">▱</span><div><span>CARPETA DE DESTINO</span><p id="out-dir">Downloads, en tu carpeta de usuario</p></div><span class="local-note">Siempre local</span></div>
+      </section>
+      <section class="benefits" aria-label="Características"><div><span class="feature-icon">↙</span><h3>Directo a tus archivos</h3><p>Elige video MP4 o solo audio MP3.</p></div><div><span class="feature-icon">◈</span><h3>Privacidad por defecto</h3><p>Sin leer tu portapapeles ni guardar historial.</p></div><div><span class="feature-icon">✧</span><h3>Sin distracciones</h3><p>Sin anuncios, cuentas ni pasos extra.</p></div></section>
+      <details class="help"><summary>¿Primera vez? Requisitos y ayuda <span>+</span></summary><p>Necesitas <strong>yt-dlp</strong> y <strong>FFmpeg</strong> instalados y disponibles en el PATH. No se descargan automáticamente. Consulta las instrucciones del README y reinicia esta interfaz después de instalarlos.</p><p>Deja abierta la terminal mientras usas la aplicación. Si cancelas, los archivos parciales se conservan. Los sitios pueden solicitar autenticación o rechazar descargas.</p></details>
+    </main>
+    <footer><span>Un enlace. Un archivo. <strong>yoinkss.</strong></span><span>Descarga solo contenido que tengas derecho a guardar.</span></footer>
+  </div>
+</body></html>
