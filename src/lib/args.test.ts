@@ -54,3 +54,14 @@ test('auto delegates to terminal colors while forced modes own the full surface'
   assert.equal(themeFor('dark').background, '#18181b')
   assert.equal(themeFor('dark').primary, '#ffffff')
 })
+
+
+test('privacy features are opt-in and non-web inputs are rejected', () => {
+  assert.equal(parseArgs([]).clipboard, undefined)
+  assert.equal(parseArgs([]).history, undefined)
+  assert.equal(parseArgs(['--clipboard', '--history']).clipboard, true)
+  assert.equal(parseArgs(['--clipboard', '--history']).history, true)
+  for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'not-a-url']) {
+    assert.match(parseArgs([url]).error ?? '', /HTTP or HTTPS/)
+  }
+})

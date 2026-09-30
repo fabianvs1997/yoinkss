@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "start": "node dist/cli.js",
     "prepublishOnly": "npm test && npm run typecheck && npm run build"
@@ -50,10 +50,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pablostanley/yoinks.git"
+    "url": "git+https://github.com/fabianvs1997/yoinkss.git"
   },
-  "homepage": "https://github.com/pablostanley/yoinks#readme",
+  "homepage": "https://github.com/fabianvs1997/yoinkss#readme",
   "bugs": {
-    "url": "https://github.com/pablostanley/yoinks/issues"
+    "url": "https://github.com/fabianvs1997/yoinkss/issues"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   }
 }

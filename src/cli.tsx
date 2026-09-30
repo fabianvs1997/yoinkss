@@ -23,6 +23,8 @@ const HELP = `
     $ yoinks                 (prompts for a url)
 
   Options
+    --clipboard     opt in to clipboard URL suggestions
+    --history       opt in to local download history
     --theme <mode>  use auto, light, or dark for this run
     -h, --help      show this help
     -v, --version   show version
@@ -55,7 +57,7 @@ const isTTY = Boolean(process.stdout.isTTY)
 
 // no url given — offer the clipboard url (⇥ to paste) when it already holds one
 let clipboardUrl: string | undefined
-if (!initialUrl && isTTY) {
+if (args.clipboard && !initialUrl && isTTY) {
   const clipped = readClipboard().trim()
   // reject multi-line clipboard content — new URL() silently strips newlines
   if (clipped && !/\s/.test(clipped) && isProbablyUrl(clipped)) clipboardUrl = clipped
@@ -83,6 +85,7 @@ let outcome: Outcome = {}
 const {waitUntilExit} = render(
   <App
     initialUrl={initialUrl}
+    historyEnabled={args.history ?? false}
     clipboardUrl={clipboardUrl}
     initialThemeMode={initialThemeMode}
     onOutcome={result => (outcome = result)}

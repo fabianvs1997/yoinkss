@@ -1,20 +1,7 @@
 import {spawn, type ChildProcess} from 'node:child_process'
-import {createWriteStream} from 'node:fs'
-import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
-import {Readable} from 'node:stream'
-import {pipeline} from 'node:stream/promises'
+import {isProbablyUrl} from './platforms.js'
 import {formatBytes} from './format.js'
-
-const YOINKS_DIR = path.join(os.homedir(), '.yoinks', 'bin')
-const RELEASE_BASE = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download'
-
-function ytDlpAssetName(): string {
-  if (process.platform === 'win32') return 'yt-dlp.exe'
-  if (process.platform === 'darwin') return 'yt-dlp_macos'
-  return process.arch === 'arm64' ? 'yt-dlp_linux_aarch64' : 'yt-dlp_linux'
-}
 
 // async on purpose: a spawnSync here blocks the event loop, which freezes
 // ink mid-frame — the user hits enter and sees nothing until it returns
@@ -32,30 +19,11 @@ function commandWorks(cmd: string, args: string[]): Promise<boolean> {
   })
 }
 
-/**
- * Resolve a usable yt-dlp binary: system install first, then a previously
- * downloaded copy, then download the standalone binary from GitHub releases.
- */
-export async function ensureYtDlp(onStatus: (message: string) => void, signal?: AbortSignal): Promise<string> {
-  if (await commandWorks('yt-dlp', ['--version'])) return 'yt-dlp'
-
-  const local = path.join(YOINKS_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
-  if (await commandWorks(local, ['--version'])) return local
-
-  onStatus('first run: fetching yt-dlp…')
-  await fs.mkdir(YOINKS_DIR, {recursive: true})
-
-  const url = `${RELEASE_BASE}/${ytDlpAssetName()}`
-  const response = await fetch(url, {signal})
-  if (!response.ok || !response.body) {
-    throw new Error(`Could not download yt-dlp (${response.status}). Check your connection and try again.`)
-  }
-
-  const tmp = `${local}.download`
-  await pipeline(Readable.fromWeb(response.body as never), createWriteStream(tmp), {signal})
-  await fs.chmod(tmp, 0o755)
-  await fs.rename(tmp, local)
-  return local
+/** Use an explicitly installed binary; never download and execute a moving release. */
+export async function ensureYtDlp(_onStatus: (message: string) => void, signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted()
+  if (await commandWorks('yt-dlp', ['--ignore-config', '--no-plugin-dirs', '--version'])) return 'yt-dlp'
+  throw new Error('Install yt-dlp from its official distribution and add it to PATH. Automatic executable downloads are disabled.')
 }
 
 /**
@@ -99,13 +67,12 @@ type RawFormat = {
 
 export type ProbeResult = {
   info: VideoInfo
-  /** Raw -J output saved to disk so downloads can skip re-extraction via --load-info-json. */
-  infoJsonPath: string
 }
 
 export async function probe(ytdlp: string, url: string, signal?: AbortSignal): Promise<ProbeResult> {
+  if (!isProbablyUrl(url)) throw new Error('Only HTTP and HTTPS URLs are supported.')
   const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(ytdlp, ['-J', '--no-playlist', '--no-warnings', url], {signal})
+    const child = spawn(ytdlp, ['--ignore-config', '--no-plugin-dirs', '-J', '--no-playlist', '--no-warnings', '--', url], {signal})
     let out = ''
     let stderr = ''
     child.stdout.on('data', chunk => (out += chunk))
@@ -127,9 +94,7 @@ export async function probe(ytdlp: string, url: string, signal?: AbortSignal): P
     throw new Error('Could not parse video info from yt-dlp.')
   }
 
-  const infoJsonPath = path.join(os.tmpdir(), `yoinks-info-${process.pid}-${Date.now()}.json`)
-  await fs.writeFile(infoJsonPath, stdout)
-  return {info, infoJsonPath}
+  return {info}
 }
 
 export type DownloadChoice = {
@@ -220,16 +185,16 @@ export function download(
     ytdlp: string
     ffmpegLocation?: string
     url: string
-    /** When set, reuse the probe's metadata instead of re-extracting — starts much faster. */
-    infoJsonPath?: string
     choice: DownloadChoice
     outDir: string
   },
   handlers: DownloadHandlers,
   signal?: AbortSignal,
 ): Promise<string> {
+  if (!isProbablyUrl(opts.url)) return Promise.reject(new Error('Only HTTP and HTTPS URLs are supported.'))
   const args = [
-    ...(opts.infoJsonPath ? ['--load-info-json', opts.infoJsonPath] : [opts.url]),
+    '--ignore-config',
+    '--no-plugin-dirs',
     ...opts.choice.args,
     '--no-playlist',
     '--no-warnings',
@@ -248,6 +213,8 @@ export function download(
   ]
   if (opts.ffmpegLocation) args.push('--ffmpeg-location', opts.ffmpegLocation)
 
+  args.push('--', opts.url)
+
   return new Promise((resolve, reject) => {
     const child = spawn(opts.ytdlp, args, {signal})
     activeChild = child
@@ -258,8 +225,6 @@ export function download(
     let totalParts = 1
     let lastDownloaded = 0
     let buffer = ''
-    // every file yt-dlp writes this run, so a cancel can clean up after itself
-    const destinations: string[] = []
 
     child.stdout.on('data', (chunk: Buffer) => {
       buffer += chunk.toString()
@@ -285,13 +250,7 @@ export function download(
           // "[info] xxx: Downloading 1 format(s): 395+251" — each id is one file
           totalParts = (line.split('format(s):')[1] ?? '').trim().split('+').length
         } else if (line.includes('[Merger]') || line.includes('[ExtractAudio]')) {
-          const merging = /^\[Merger\] Merging formats into "(.+)"$/.exec(line)?.[1]
-          const extracting = /^\[ExtractAudio\] Destination: (.+)$/.exec(line)?.[1]
-          const target = merging ?? extracting
-          if (target) destinations.push(target)
           handlers.onProcessing()
-        } else if (line.startsWith('[download] Destination: ')) {
-          destinations.push(line.slice('[download] Destination: '.length))
         } else if (path.isAbsolute(line)) {
           filepath = line
         }
@@ -302,8 +261,7 @@ export function download(
     child.on('close', code => {
       activeChild = undefined
       if (signal?.aborted) {
-        // cancelled on purpose — don't leave half-written files behind
-        void removePartials(destinations)
+        // Preserve partial files: subprocess output is not authority to delete paths.
         reject(new Error('Download cancelled.'))
         return
       }
@@ -314,14 +272,6 @@ export function download(
       }
     })
   })
-}
-
-function removePartials(destinations: string[]): Promise<unknown> {
-  return Promise.allSettled(
-    destinations
-      .flatMap(dest => [dest, `${dest}.part`, `${dest}.ytdl`])
-      .map(file => fs.rm(file, {force: true})),
-  )
 }
 
 function toNumber(value: string | undefined): number | undefined {

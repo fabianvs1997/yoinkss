@@ -14,20 +14,29 @@ no sketchy redirects.
 
 <img src="assets/home.png" alt="yoinks home screen — paste a link and hit yoink" width="100%">
 
-## Install
+## Install this security-hardened variant
+
+Use Node.js 24 and install yt-dlp and ffmpeg separately from their official
+projects, making both available on PATH.
 
 ```sh
-npm install -g yoinks
+git clone https://github.com/fabianvs1997/yoinkss.git
+cd yoinkss
+npm ci --ignore-scripts
+npm run build
+node dist/cli.js
 ```
 
-Or try it without installing anything:
+`npm install -g yoinks` and `npx yoinks` install the upstream npm package,
+not the changes in this repository. This variant never downloads yt-dlp
+automatically. With dependency install scripts disabled, install ffmpeg
+separately; the ffmpeg-static binary is not fetched.
+
+To use the `yoinks` command in the examples below after building:
 
 ```sh
-npx yoinks
+npm link --ignore-scripts
 ```
-
-Requires Node 18+. Everything else (yt-dlp, ffmpeg) is fetched or bundled
-automatically.
 
 ## Usage
 
@@ -54,9 +63,8 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 
 ## How it works
 
-- Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). On first run,
-  yoinks downloads the standalone yt-dlp binary to `~/.yoinks/bin` —
-  no Python required. If you already have yt-dlp installed, it uses yours.
+- Powered by an explicitly installed [yt-dlp](https://github.com/yt-dlp/yt-dlp) on PATH.
+  Existing copies under `~/.yoinks/bin` are not executed automatically.
 - ffmpeg (needed for merging high-res streams and mp3 extraction) is found
   on your PATH, with `ffmpeg-static` as a bundled fallback.
 - The UI is [Ink](https://github.com/vadimdemedes/ink) — React for the
@@ -65,7 +73,7 @@ click the theme control in the footer to cycle through `auto`, `light`, and
 ## Development
 
 ```sh
-npm install
+npm ci --ignore-scripts
 npm run build        # bundle to dist/ with tsup
 npm run dev          # rebuild on change
 node dist/cli.js <url>
@@ -94,3 +102,28 @@ keep, and be excellent to creators.
 ## License
 
 [MIT](LICENSE)
+
+
+## Security changes in this variant
+
+- Clipboard access requires `--clipboard`; local URL history requires `--history`.
+- New history files request owner-only permissions on POSIX. Windows permissions
+  depend on the account ACLs. Existing history is not erased or migrated.
+- Video metadata stays in memory; the download re-extracts it. This can be slower.
+- Cancelling leaves partial downloads in place for manual cleanup/resumption.
+  Paths printed by subprocesses are never used as instructions to delete files.
+- Only HTTP(S) input URLs are accepted. yt-dlp receives an option terminator,
+  `--ignore-config` and `--no-plugin-dirs` to avoid implicit local configuration/plugins.
+- System binaries on PATH and npm dependencies remain a trust boundary. This is
+  hardening, not a malware-free certification or a sandbox.
+
+This repository is based on [pablostanley/yoinks](https://github.com/pablostanley/yoinks).
+The original MIT license and attribution are preserved.
+
+### Validation
+
+Run `npm test`, `npm run typecheck`, `npm run build`, and
+`npm audit --package-lock-only --ignore-scripts` to check this variant.
+The security tests use local fake subprocesses; they do not download videos.
+POSIX subprocess tests are skipped on Windows. Real downloads and Windows/macOS
+behavior still require separate verification.

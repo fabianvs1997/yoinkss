@@ -126,6 +126,7 @@ const HINTS: Record<Phase['name'], Array<[string, string]>> = {
 }
 
 type AppProps = {
+  historyEnabled?: boolean
   initialUrl?: string
   clipboardUrl?: string
   initialThemeMode?: ThemeMode
@@ -147,10 +148,12 @@ export function App({initialThemeMode = 'auto', ...props}: AppProps) {
 
 function AppContent({
   initialUrl,
+  historyEnabled = false,
   clipboardUrl,
   onOutcome,
   cycleTheme,
 }: {
+  historyEnabled?: boolean
   initialUrl?: string
   clipboardUrl?: string
   onOutcome: (outcome: Outcome) => void
@@ -161,13 +164,12 @@ function AppContent({
   const {stdout} = useStdout()
   const [url, setUrl] = useState(initialUrl ?? '')
   const [urlInput, setUrlInput] = useState('')
-  const [history, setHistory] = useState(loadHistory)
+  const [history, setHistory] = useState(() => historyEnabled ? loadHistory() : [])
   const [platform, setPlatform] = useState<Platform>()
   const [info, setInfo] = useState<VideoInfo>()
   const [choices, setChoices] = useState<DownloadChoice[]>([])
   const ytdlpRef = useRef('')
   const highlightRef = useRef(0) // choice under the cursor, for the ↵ hint click
-  const infoJsonRef = useRef<string | undefined>(undefined)
   const abortRef = useRef<AbortController | undefined>(undefined)
   const [phase, setPhase] = useState<Phase>(initialUrl ? {name: 'probing', status: 'warming up…'} : {name: 'input'})
 
@@ -187,9 +189,8 @@ function AppContent({
       ytdlpRef.current = ytdlp
       if (controller.signal.aborted) return
       setPhase({name: 'probing', status: 'fetching video info…'})
-      const {info: videoInfo, infoJsonPath} = await probe(ytdlp, targetUrl, controller.signal)
+      const {info: videoInfo} = await probe(ytdlp, targetUrl, controller.signal)
       if (controller.signal.aborted) return
-      infoJsonRef.current = infoJsonPath
       setInfo(videoInfo)
       setChoices(buildChoices(videoInfo))
       highlightRef.current = 0
@@ -260,20 +261,9 @@ function AppContent({
       try {
         const ffmpegLocation = await findFfmpeg()
         const base = {ytdlp: ytdlpRef.current, ffmpegLocation, url, choice, outDir: OUT_DIR}
-        let filepath: string
-        try {
-          // reuse the probe's metadata — starts immediately instead of re-extracting
-          filepath = await download({...base, infoJsonPath: infoJsonRef.current}, handlers, controller.signal)
-        } catch (error) {
-          if (controller.signal.aborted) throw error
-          // media urls in the cached info can expire — retry with a fresh extraction
-          setPhase(prev =>
-            prev.name === 'downloading' ? {...prev, progress: undefined, refreshing: true} : prev,
-          )
-          filepath = await download(base, handlers, controller.signal)
-        }
+        const filepath = await download(base, handlers, controller.signal)
         onOutcome({filepath})
-        setHistory(addToHistory(url))
+        if (historyEnabled) setHistory(addToHistory(url))
         setPhase({name: 'done', filepath})
       } catch (error) {
         if (controller.signal.aborted) return

@@ -18,8 +18,8 @@ export function loadHistory(): string[] {
 export function addToHistory(url: string): string[] {
   const next = [url, ...loadHistory().filter(entry => entry !== url)].slice(0, LIMIT)
   try {
-    fs.mkdirSync(path.dirname(HISTORY_FILE), {recursive: true})
-    fs.writeFileSync(HISTORY_FILE, `${JSON.stringify(next, null, 2)}\n`)
+    fs.mkdirSync(path.dirname(HISTORY_FILE), {recursive: true, mode: 0o700})
+    fs.writeFileSync(HISTORY_FILE, `${JSON.stringify(next, null, 2)}\n`, {mode: 0o600})
   } catch {
     // history is a nicety — never let it break a download
   }

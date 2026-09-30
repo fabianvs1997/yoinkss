@@ -1,3 +1,4 @@
+import {isProbablyUrl} from './platforms.js'
 import {isThemeMode, type ThemeMode} from '../theme.js'
 
 export type CliArgs = {
@@ -5,6 +6,8 @@ export type CliArgs = {
   version: boolean
   initialUrl?: string
   themeMode?: ThemeMode
+  clipboard?: boolean
+  history?: boolean
   error?: string
 }
 
@@ -18,6 +21,10 @@ export function parseArgs(args: string[]): CliArgs {
       result.help = true
     } else if (arg === '-v' || arg === '--version') {
       result.version = true
+    } else if (arg === '--clipboard') {
+      result.clipboard = true
+    } else if (arg === '--history') {
+      result.history = true
     } else if (arg === '--theme') {
       const value = args[++index]
       if (!value) return {...result, error: '--theme needs a value: auto, light, or dark'}
@@ -35,6 +42,7 @@ export function parseArgs(args: string[]): CliArgs {
   }
 
   if (positional.length > 1) return {...result, error: 'expected a single url'}
+  if (positional[0] && !isProbablyUrl(positional[0])) return {...result, error: 'expected an HTTP or HTTPS URL'}
   result.initialUrl = positional[0]
   return result
 }
